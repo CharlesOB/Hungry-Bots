@@ -1,0 +1,38 @@
+Game with computer players that are continuously created and destroyed, only the most fit being
+reproduced--genetic algorithm. 
+
+The game:
+Players are different colors--like representing species. There will be 3 colors: RYB.
+Players can collect "food." Eating food increases health. Health decreases over time.
+Players can "see" distances to food.
+The fitness function is simply a measure of length of life--the longer the life, the better the
+score.
+
+Sensor layout:
+
+Physical sensors on the front half of the player, one on each side. There are 2 sensor
+nodes.
+A food sensor on each side will tell what is the distance to the nearest food in that direction.
+   
+The input sensor nodes in the input array will be in the following order:
+ - Left food
+ - Right food
+   
+Neural Networks in the players will consist of a basic forward propogation network with the
+above listed inputs and the following outputs:
+ - a binary output determining weather the player is building wall at this moment or not.
+   When the output is positive or 0 the player builds; at negative he does not. The walls 
+   will be a pretty visual, but unnecessary. The players will need to evolve to ignore this 
+   output. I am curious what patterns we may see with this though.
+ - an output which determines the speed at which the player moves forward (or backward for 
+   negative values). A value of 1.0 represents full speed.
+ - an output which determines how much the player is turning during the current update, a 
+   negative value being left and a positive value being right. A value of -1.0 or 1.0 represent
+   the tightest possible turn.
+   
+There are 3 output nodes. They will be in the following order in the output array:
+ - speed
+ - directional change
+ - build wall
+   
+
