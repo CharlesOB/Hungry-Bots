@@ -6,6 +6,7 @@ In this script, bots (colored circles) must eat food (collide with small white d
 <img src="https://raw.githubusercontent.com/CharlesOB/Hungry-Bots/main/Screen Capture 1.gif" height="500">
 
 
+
 After they have trained for five to ten minutes, the bots already display "intelligent" behavior, spotting food and moving towards it. Some bots still struggle--this is often the result of random mutation, a necessary component of a genetic algorithm.
 
 <img src="https://raw.githubusercontent.com/CharlesOB/Hungry-Bots/main/Screen Capture 2.gif" height="500">
