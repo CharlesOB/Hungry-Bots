@@ -10,3 +10,14 @@ In this script, bots (colored circles) must eat food (collide with small white d
 After they have trained for five to ten minutes, the bots already display "intelligent" behavior, spotting food and moving towards it. Some bots still struggle--this is often the result of random mutation, a necessary component of a genetic algorithm.
 
 <img src="https://raw.githubusercontent.com/CharlesOB/Hungry-Bots/main/Screen Capture 2.gif" height="500">
+
+## Execution
+The script uses Python 3 with numpy and pygame installed using `pip`.
+```
+pip3 install numpy pygame
+```
+Running the script is as simple as
+```
+python3 hungry_bots.py
+```
+Have fun watching your little bots learn!
