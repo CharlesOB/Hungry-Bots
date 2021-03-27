@@ -38,57 +38,79 @@ def dist(pos1, pos2):
 class Brain:
 
   num_input_nodes = 2
+  num_hidden_layers = 1
   size_hidden_layer = 20
   num_output_nodes = 3
 
-  def __init__(self, w1, b1, w2, b2):
+  def __init__(self, w1, b1, wbh, w2, b2):
     self.w1 = w1
     self.b1 = b1
+    self.wbh = wbh
     self.w2 = w2
     self.b2 = b2
     
   def calc(self, inputs):
     z1 = inputs.dot(self.w1) + self.b1
     a1 = np.tanh(z1)
-    z2 = a1.dot(self.w2) + self.b2
+    ah = a1
+    for wh, bh in self.wbh:
+      zh = ah.dot(wh) + bh
+      ah = np.tanh(zh)
+    z2 = ah.dot(self.w2) + self.b2
     a2 = np.tanh(z2)
     return a2
     
   def list_from_brain(self):
-    return np.append(np.append(np.append(self.w1, self.b1), self.w2), self.b2).tolist()
-
-  def mutate(self):
-    self_list = self.list_from_brain()
-    num_mut = int(r.random() * 10)
-    for i in range(num_mut):
-      index = int(r.random() * len(self_list))
-      self_list[index] = r.random() * 2 - 1
-    return Brain.brain_from_list(self_list)
+    array = np.append(self.w1, self.b1)
+    for wh, bh in self.wbh:
+      array = np.append(np.append(array, wh), bh)
+    return np.append(np.append(array, self.w2), self.b2).tolist()
 
   @staticmethod
   def random_brain():
-    w1 = np.random.randn(Brain.num_input_nodes, Brain.size_hidden_layer)
-    b1 = np.random.randn(1, Brain.size_hidden_layer)
-    w2 = np.random.randn(Brain.size_hidden_layer, Brain.num_output_nodes)
+    w1 = np.random.randn(Brain.num_input_nodes, Brain.size_hidden_layers)
+    b1 = np.random.randn(1, Brain.size_hidden_layers)
+    
+    wbh = []
+    for i in range(Brain.num_hidden_layers-1):
+      wh = np.random.randn(Brain.size_hidden_layers, Brain.size_hidden_layers)
+      bh = np.random.randn(1, Brain.size_hidden_layers)
+      wbh.append((wh, bh))
+
+    w2 = np.random.randn(Brain.size_hidden_layers, Brain.num_output_nodes)
     b2 = np.random.randn(1, Brain.num_output_nodes)
-    return Brain(w1, b1, w2, b2)
+    return Brain(w1, b1, wbh, w2, b2)
   
   @staticmethod
   def brain_from_list(array):
-    w1_end = Brain.num_input_nodes * Brain.size_hidden_layer
-    b1_end = w1_end + Brain.size_hidden_layer
-    w2_end = b1_end + (Brain.size_hidden_layer * Brain.num_output_nodes)
-    b2_end = w2_end + Brain.num_output_nodes
+    w1_end = Brain.num_input_nodes * Brain.size_hidden_layers
+    b1_end = w1_end + Brain.size_hidden_layers
     w1_part = array[:w1_end]
     b1_part = array[w1_end:b1_end]
-    w2_part = array[b1_end:w2_end]
-    b2_part = array[w2_end:b2_end]
     w1 = np.asarray(np.array_split(w1_part, Brain.num_input_nodes))
     b1 = np.asarray([b1_part])
-    w2 = np.asarray(np.array_split(w2_part, Brain.size_hidden_layer))
+    
+    wbh = []
+    wbh_end = b1_end
+    for i in range(Brain.num_hidden_layers-1):
+      wh_end = wbh_end + (Brain.size_hidden_layers ** 2)
+      bh_end = wh_end + Brain.size_hidden_layers
+      wh_part = array[wbh_end:wh_end]
+      bh_part = array[wh_end:bh_end]
+      wh = np.asarray(np.array_split(wh_part, Brain.size_hidden_layers))
+      bh = np.asarray([bh_part])
+      wbh.append((wh, bh))
+      wbh_end = bh_end
+      
+    w2_end = wbh_end + (Brain.size_hidden_layers * Brain.num_output_nodes)
+    b2_end = w2_end + Brain.num_output_nodes
+    w2_part = array[wbh_end:w2_end]
+    b2_part = array[w2_end:b2_end]
+    w2 = np.asarray(np.array_split(w2_part, Brain.size_hidden_layers))
     b2 = np.asarray([b2_part])
-    return Brain(w1, b1, w2, b2)
-
+    
+    return Brain(w1, b1, wbh, w2, b2)
+  
   
 class Bot:
   
