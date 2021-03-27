@@ -38,65 +38,82 @@ def dist(pos1, pos2):
 class Brain:
 
   num_input_nodes = 2
-  size_hidden_layer = 20
+  num_hidden_layers = 1
+  size_hidden_layers = 20
   num_output_nodes = 3
 
-  def __init__(self, w1, b1, w2, b2):
+  def __init__(self, w1, b1, wbh, w2, b2):
     self.w1 = w1
     self.b1 = b1
+    self.wbh = wbh
     self.w2 = w2
     self.b2 = b2
     
   def calc(self, inputs):
     z1 = inputs.dot(self.w1) + self.b1
     a1 = np.tanh(z1)
-    z2 = a1.dot(self.w2) + self.b2
+    ah = a1
+    for wh, bh in self.wbh:
+      zh = ah.dot(wh) + bh
+      ah = np.tanh(zh)
+    z2 = ah.dot(self.w2) + self.b2
     a2 = np.tanh(z2)
     return a2
     
   def list_from_brain(self):
-    return np.append(np.append(np.append(self.w1, self.b1), self.w2), self.b2).tolist()
-
-  def mutate(self):
-    self_list = self.list_from_brain()
-    num_mut = int(r.random() * 10)
-    for i in range(num_mut):
-      index = int(r.random() * len(self_list))
-      self_list[index] = r.random() * 2 - 1
-    return Brain.brain_from_list(self_list)
+    array = np.append(self.w1, self.b1)
+    for wh, bh in self.wbh:
+      array = np.append(np.append(array, wh), bh)
+    return np.append(np.append(array, self.w2), self.b2).tolist()
 
   @staticmethod
   def random_brain():
-    w1 = np.random.randn(Brain.num_input_nodes, Brain.size_hidden_layer)
-    b1 = np.random.randn(1, Brain.size_hidden_layer)
-    w2 = np.random.randn(Brain.size_hidden_layer, Brain.num_output_nodes)
+    w1 = np.random.randn(Brain.num_input_nodes, Brain.size_hidden_layers)
+    b1 = np.random.randn(1, Brain.size_hidden_layers)
+    
+    wbh = []
+    for i in range(Brain.num_hidden_layers-1):
+      wh = np.random.randn(Brain.size_hidden_layers, Brain.size_hidden_layers)
+      bh = np.random.randn(1, Brain.size_hidden_layers)
+      wbh.append((wh, bh))
+
+    w2 = np.random.randn(Brain.size_hidden_layers, Brain.num_output_nodes)
     b2 = np.random.randn(1, Brain.num_output_nodes)
-    return Brain(w1, b1, w2, b2)
+    return Brain(w1, b1, wbh, w2, b2)
   
   @staticmethod
   def brain_from_list(array):
-    w1_end = Brain.num_input_nodes * Brain.size_hidden_layer
-    b1_end = w1_end + Brain.size_hidden_layer
-    w2_end = b1_end + (Brain.size_hidden_layer * Brain.num_output_nodes)
-    b2_end = w2_end + Brain.num_output_nodes
+    w1_end = Brain.num_input_nodes * Brain.size_hidden_layers
+    b1_end = w1_end + Brain.size_hidden_layers
     w1_part = array[:w1_end]
     b1_part = array[w1_end:b1_end]
-    w2_part = array[b1_end:w2_end]
-    b2_part = array[w2_end:b2_end]
     w1 = np.asarray(np.array_split(w1_part, Brain.num_input_nodes))
     b1 = np.asarray([b1_part])
-    w2 = np.asarray(np.array_split(w2_part, Brain.size_hidden_layer))
+    
+    wbh = []
+    wbh_end = b1_end
+    for i in range(Brain.num_hidden_layers-1):
+      wh_end = wbh_end + (Brain.size_hidden_layers ** 2)
+      bh_end = wh_end + Brain.size_hidden_layers
+      wh_part = array[wbh_end:wh_end]
+      bh_part = array[wh_end:bh_end]
+      wh = np.asarray(np.array_split(wh_part, Brain.size_hidden_layers))
+      bh = np.asarray([bh_part])
+      wbh.append((wh, bh))
+      wbh_end = bh_end
+      
+    w2_end = wbh_end + (Brain.size_hidden_layers * Brain.num_output_nodes)
+    b2_end = w2_end + Brain.num_output_nodes
+    w2_part = array[wbh_end:w2_end]
+    b2_part = array[w2_end:b2_end]
+    w2 = np.asarray(np.array_split(w2_part, Brain.size_hidden_layers))
     b2 = np.asarray([b2_part])
-    return Brain(w1, b1, w2, b2)
-
+    
+    return Brain(w1, b1, wbh, w2, b2)
+  
   
 class Bot:
   
-  RED = -1
-  YELLOW = 0
-  BLUE = 1
-  colors = {RED:(255, 0, 0), YELLOW:(255, 255, 0), BLUE:(0, 0, 255)}
-  color_keys = sorted(colors)
   dtheta_max = math.pi / 16
   
   def __init__(self, color=None, brain=None):
@@ -105,7 +122,7 @@ class Bot:
     if brain is None:
       self.brain = Brain.random_brain()
     if color is None:
-      self.color = r.choice(Bot.color_keys)
+      self.color = Bot.random_color()
     self.health = 1.0
     self.num_updates = 0
     self.x = r.random() * screen_width
@@ -120,7 +137,8 @@ class Bot:
        
   def get_dna(self):
     dna = self.brain.list_from_brain()
-    dna.append(self.color)
+    for value in self.color:
+      dna.append((value-127.5)/127.5)
     return dna
     
   def mutate(self):
@@ -132,12 +150,11 @@ class Bot:
     return Bot.bot_from_dna(dna)
     
   def draw(self, screen):
-    color = Bot.colors[self.color]
     x1 = int(self.x + self.width * math.cos(self.theta))
     y1 = int(self.y + self.height * math.sin(self.theta))
     x2 = int(self.x)
     y2 = int(self.y)
-    pygame.draw.circle(screen, color, (int(self.x), int(self.y)), self.width)
+    pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.width)
     pygame.draw.line(screen, (0, 0, 0), (x1, y1), (x2, y2), 6)
     width = int(self.width * (self.health if self.health < 1 else 1))
     left = self.x - self.width / 2
@@ -150,14 +167,7 @@ class Bot:
     self.num_updates += 1
     self.health -= 0.002
   
-    obot_distr = 100000000
-    sbot_distr = 100000000
-    owall_distr = 100000000
     food_distr = 100000000
-    
-    obot_distl = 100000000
-    sbot_distl = 100000000
-    owall_distl = 100000000
     food_distl = 100000000
 
     for food in engine.foods:
@@ -196,18 +206,17 @@ class Bot:
       if dist((self.x, self.y), (food.x, food.y)) <= self.width:
         self.health += 0.05
         engine.foods.remove(food)
-    
+ 
+  @staticmethod
+  def random_color():
+    return (r.randint(0, 255), r.randint(0, 255), r.randint(0, 255))
+ 
   @staticmethod
   def bot_from_dna(dna):
-    color = int(dna[-1])
-    if color not in Bot.color_keys:
-      if color < color_keys[0]:
-        color = color_keys[0]
-      elif color > color_keys[-1]:
-        color = color_keys[-1]
-    brain = Brain.brain_from_list(dna[0:-1])
+    color = (int(127.5*dna[-3]+127.5), int(127.5*dna[-2]+127.5), int(127.5*dna[-1]+127.5))
+    brain = Brain.brain_from_list(dna[0:-3])
     return Bot(color, brain)
-    
+  
   @staticmethod
   def make_child(bot1, bot2):
     dna1 = bot1.get_dna()
@@ -219,13 +228,13 @@ class Bot:
       else:
         dna.append(dna2[i])
     new_bot = Bot.bot_from_dna(dna)
-    if r.random() < 0.001:
+    if r.random() < 0.2:
       new_bot = new_bot.mutate()
     return new_bot
 
 
 class Wall:
-  def __init__(self, color=Bot.RED):
+  def __init__(self, color=Bot.random_color()):
     self.color = color
     self.points = []
     self.num_updates = 0
@@ -239,7 +248,7 @@ class Wall:
     
   def draw(self, screen):
     if len(self.points) > 1:
-      pygame.draw.lines(screen, Bot.colors[self.color], False, self.points, 2)
+      pygame.draw.lines(screen, self.color, False, self.points, 2)
     
   def update(self):
     self.num_updates += 1
