@@ -5,7 +5,7 @@ import random as r
 import math
 
 np.random.seed(int(r.random()*999999))
-screen_width = 1200
+screen_width = 1500
 screen_height = 800
 
 # This function returns a boolean for whether pos2 (a point in the form of (x, y)) is to the left of an
@@ -37,9 +37,9 @@ def dist(pos1, pos2):
 
 class Brain:
 
-  num_input_nodes = 2
-  num_hidden_layers = 1
-  size_hidden_layers = 20
+  num_input_nodes = 4
+  num_hidden_layers = 5
+  size_hidden_layers = 50
   num_output_nodes = 3
 
   def __init__(self, w1, b1, wbh, w2, b2):
@@ -110,7 +110,7 @@ class Brain:
     b2 = np.asarray([b2_part])
     
     return Brain(w1, b1, wbh, w2, b2)
-  
+
   
 class Bot:
   
@@ -125,6 +125,7 @@ class Bot:
       self.color = Bot.random_color()
     self.health = 1.0
     self.num_updates = 0
+    self.fitness = 0
     self.x = r.random() * screen_width
     self.y = r.random() * screen_height
     self.speed = 0.
@@ -135,6 +136,9 @@ class Bot:
     self.building_wall = False
     self.current_wall = None
        
+  def get_fitness(self):
+    return self.num_updates
+       
   def get_dna(self):
     dna = self.brain.list_from_brain()
     for value in self.color:
@@ -143,7 +147,9 @@ class Bot:
     
   def mutate(self):
     dna = self.get_dna()
-    num_mut = int(r.random() * 10)
+    num_mut = int(len(dna) * 0.1)
+    if r.random() > 0.5: # This makes a random gradient from 0 to 10% mutation for half of the mutations.
+      num_mult = int((r.random() ** 3) * len(dna) * 0.1)
     for i in range(num_mut):
       index = int(r.random() * len(dna))
       dna[index] = r.random() * 2 - 1
@@ -168,7 +174,10 @@ class Bot:
     self.health -= 0.002
   
     food_distr = 100000000
+    food_is_poisonr = 0
+    
     food_distl = 100000000
+    food_is_poisonl = 0
 
     for food in engine.foods:
       food_dist = dist((self.x, self.y), (food.x, food.y))
@@ -176,11 +185,13 @@ class Bot:
       if left:
         if food_dist < food_distl:
           food_distl = food_dist
+          food_is_poisonl = -20 if food.is_poison else 20
       else:
         if food_dist < food_distr:
           food_distr = food_dist
+          food_is_poisonr = -20 if food.is_poison else 20
           
-    inputs = [[food_distl, food_distr]]
+    inputs = [[food_distl, food_is_poisonl, food_distr, food_is_poisonr]]
     outputs = self.brain.calc(np.asarray(inputs))
     self.speed = outputs[0][0]
     self.dtheta = outputs[0][1]
@@ -202,21 +213,16 @@ class Bot:
     self.x += 5 * self.speed * math.cos(self.theta)
     self.y += 5 * self.speed * math.sin(self.theta)
     
-    for food in engine.foods:
-      if dist((self.x, self.y), (food.x, food.y)) <= self.width:
-        self.health += 0.05
-        engine.foods.remove(food)
- 
   @staticmethod
   def random_color():
     return (r.randint(0, 255), r.randint(0, 255), r.randint(0, 255))
- 
+  
   @staticmethod
   def bot_from_dna(dna):
     color = (int(127.5*dna[-3]+127.5), int(127.5*dna[-2]+127.5), int(127.5*dna[-1]+127.5))
     brain = Brain.brain_from_list(dna[0:-3])
     return Bot(color, brain)
-  
+    
   @staticmethod
   def make_child(bot1, bot2):
     dna1 = bot1.get_dna()
@@ -254,12 +260,21 @@ class Wall:
     self.num_updates += 1
     
 class Food:
+  poison_chance = 0.1 # 10% chance that a food will be poisonous
+
   def __init__(self):
     self.x = int(r.random() * screen_width)
     self.y = int(r.random() * screen_height)
+    self.is_poison = True
+    if r.random() > Food.poison_chance:
+      self.is_poison = False
     
   def draw(self, screen):
-    pygame.draw.circle(screen, (255, 255, 255), (self.x, self.y), 3)
+    color = (255, 255, 255)
+    if self.is_poison:
+      color = (255, 0, 0)    
+    pygame.draw.circle(screen, color, (self.x, self.y), 3)
+
 
 
 class Engine:
@@ -273,35 +288,46 @@ class Engine:
     self.num_updates = 0
     
   def draw(self, screen):
-    for bot in self.bots:
-      bot.draw(screen)
     for wall in self.walls:
       wall.draw(screen)
+    for bot in self.bots:
+      bot.draw(screen)
     for food in self.foods:
       food.draw(screen)
     screen.fill((0, 0, 0), Rect(0, 0, 250, 100))
     font = pygame.font.SysFont("monospace", 15)
     text = font.render("Number of bots: " + str(len(self.all_bots)), 0, (255, 255, 255))
-    text2 = font.render("Highest Fitness: " + str(self.all_bots[0].num_updates), 0, (255, 255, 255))
+    text2 = font.render("Highest Fitness: " + str(self.all_bots[0].get_fitness()), 0, (255, 255, 255))
     avg_fitness = 0
     if len(self.recent_bots) > 0:
-      avg_fitness = sum(map(lambda bot: bot.num_updates, self.bots)) / len(self.bots)
+      avg_fitness = sum(map(lambda bot: bot.get_fitness(), self.bots)) / len(self.bots)
     text3 = font.render("Avgerage Fitness: " + str(avg_fitness), 0, (255, 255, 255))
+    text4 = font.render("Poison Chance: " + str(Food.poison_chance), 0, (255, 255, 255))
     screen.blit(text, (20, 20))
     screen.blit(text2, (20, 40))
     screen.blit(text3, (20, 60))
+    screen.blit(text4, (20, 80))
       
   def update(self):
     self.num_updates += 1
     if self.num_updates % 2000 == 0:
-      self.all_bots.sort(key=lambda bot: -bot.num_updates)
+      self.all_bots.sort(key=lambda bot: -bot.get_fitness())
       f = open("log.txt", "a")
       f.write("\n\nUpdate #: " + str(self.num_updates))
       f.write("\n" + str(self.all_bots[0].get_dna()))
-      f.write("\nHighest Fitness: " + str(self.all_bots[0].num_updates))
+      f.write("\nHighest Fitness: " + str(self.all_bots[0].get_fitness()))
       f.close()
+      if Food.poison_chance < 0.25:
+        Food.poison_chance += 0.02
     remove_bots = []
+    self.move()
     for bot in self.bots:
+      for food in self.foods:
+        if dist((bot.x, bot.y), (food.x, food.y)) <= bot.width:
+          bot.health += (0.1 if not food.is_poison else -0.25)
+          if not food.is_poison:
+            bot.fitness += 1
+          engine.foods.remove(food)
       bot.update(self)
       if bot.health <= 0:
         remove_bots.append(bot)
@@ -311,12 +337,13 @@ class Engine:
     while len(self.recent_bots) > self.num_bots:
       self.recent_bots.remove(self.recent_bots[0])
     
-    if len(self.bots) < self.num_bots:
-      self.all_bots.sort(key=lambda bot: -bot.num_updates)
-      reproduce_bots = self.recent_bots[:] + self.bots[:]
-      reproduce_bots.sort(key=lambda bot: -bot.num_updates)
+    if len(self.bots) < 1:
+      self.foods = []
+      self.all_bots.sort(key=lambda bot: -bot.get_fitness())
+      reproduce_bots = self.recent_bots[:] # + self.bots[:]
+      reproduce_bots.sort(key=lambda bot: -bot.get_fitness())
       good_bots = reproduce_bots[:5]
-      for i in range(2):
+      for i in range(1):
         good_bots.append(r.choice(reproduce_bots[5:]))
       while len(self.bots) < self.num_bots:
         bot1 = r.choice(good_bots)
@@ -358,8 +385,8 @@ pygame.display.set_caption('Genetic Programming Example')
 clock = pygame.time.Clock()
 running = True
 
-engine = Engine(20)
-for i in range(20):
+engine = Engine(25)
+for i in range(50): # Start with 50 to give them a head start.
   engine.add_bot(Bot())
 
 while True:
@@ -372,7 +399,6 @@ while True:
 
   if running:
     engine.update()
-    engine.move()
     screen.fill((0, 0, 0))
     engine.draw(screen)
     pygame.display.update()
