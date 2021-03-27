@@ -39,7 +39,7 @@ class Brain:
 
   num_input_nodes = 2
   num_hidden_layers = 1
-  size_hidden_layer = 20
+  size_hidden_layers = 20
   num_output_nodes = 3
 
   def __init__(self, w1, b1, wbh, w2, b2):
