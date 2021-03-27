@@ -114,11 +114,6 @@ class Brain:
   
 class Bot:
   
-  RED = -1
-  YELLOW = 0
-  BLUE = 1
-  colors = {RED:(255, 0, 0), YELLOW:(255, 255, 0), BLUE:(0, 0, 255)}
-  color_keys = sorted(colors)
   dtheta_max = math.pi / 16
   
   def __init__(self, color=None, brain=None):
@@ -127,7 +122,7 @@ class Bot:
     if brain is None:
       self.brain = Brain.random_brain()
     if color is None:
-      self.color = r.choice(Bot.color_keys)
+      self.color = Bot.random_color()
     self.health = 1.0
     self.num_updates = 0
     self.x = r.random() * screen_width
@@ -142,7 +137,8 @@ class Bot:
        
   def get_dna(self):
     dna = self.brain.list_from_brain()
-    dna.append(self.color)
+    for value in self.color:
+      dna.append((value-127.5)/127.5)
     return dna
     
   def mutate(self):
@@ -154,12 +150,11 @@ class Bot:
     return Bot.bot_from_dna(dna)
     
   def draw(self, screen):
-    color = Bot.colors[self.color]
     x1 = int(self.x + self.width * math.cos(self.theta))
     y1 = int(self.y + self.height * math.sin(self.theta))
     x2 = int(self.x)
     y2 = int(self.y)
-    pygame.draw.circle(screen, color, (int(self.x), int(self.y)), self.width)
+    pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.width)
     pygame.draw.line(screen, (0, 0, 0), (x1, y1), (x2, y2), 6)
     width = int(self.width * (self.health if self.health < 1 else 1))
     left = self.x - self.width / 2
@@ -172,14 +167,7 @@ class Bot:
     self.num_updates += 1
     self.health -= 0.002
   
-    obot_distr = 100000000
-    sbot_distr = 100000000
-    owall_distr = 100000000
     food_distr = 100000000
-    
-    obot_distl = 100000000
-    sbot_distl = 100000000
-    owall_distl = 100000000
     food_distl = 100000000
 
     for food in engine.foods:
@@ -218,18 +206,17 @@ class Bot:
       if dist((self.x, self.y), (food.x, food.y)) <= self.width:
         self.health += 0.05
         engine.foods.remove(food)
-    
+ 
+  @staticmethod
+  def random_color():
+    return (r.randint(0, 255), r.randint(0, 255), r.randint(0, 255))
+ 
   @staticmethod
   def bot_from_dna(dna):
-    color = int(dna[-1])
-    if color not in Bot.color_keys:
-      if color < color_keys[0]:
-        color = color_keys[0]
-      elif color > color_keys[-1]:
-        color = color_keys[-1]
-    brain = Brain.brain_from_list(dna[0:-1])
+    color = (int(127.5*dna[-3]+127.5), int(127.5*dna[-2]+127.5), int(127.5*dna[-1]+127.5))
+    brain = Brain.brain_from_list(dna[0:-3])
     return Bot(color, brain)
-    
+  
   @staticmethod
   def make_child(bot1, bot2):
     dna1 = bot1.get_dna()
@@ -241,13 +228,13 @@ class Bot:
       else:
         dna.append(dna2[i])
     new_bot = Bot.bot_from_dna(dna)
-    if r.random() < 0.001:
+    if r.random() < 0.2:
       new_bot = new_bot.mutate()
     return new_bot
 
 
 class Wall:
-  def __init__(self, color=Bot.RED):
+  def __init__(self, color=Bot.random_color()):
     self.color = color
     self.points = []
     self.num_updates = 0
@@ -261,7 +248,7 @@ class Wall:
     
   def draw(self, screen):
     if len(self.points) > 1:
-      pygame.draw.lines(screen, Bot.colors[self.color], False, self.points, 2)
+      pygame.draw.lines(screen, self.color, False, self.points, 2)
     
   def update(self):
     self.num_updates += 1
