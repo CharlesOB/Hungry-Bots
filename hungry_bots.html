@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+	<head>
+	    <title>OwenBlock.com</title>
+		<style>
+			body {
+				font-family: 'Source Sans Pro', sans-serif;
+				display: flex;
+				height: 100vh;
+				overflow: hidden;
+				flex-direction: column;
+				justify-content: center;
+				align-items: center;
+				background-color: #000000;
+			}
+			
+			svg {
+				width: 90vw;
+				height: 90vh;
+			}
+			
+			text {
+			
+			}
+		</style>
+	</head>
+	
+	<body>
+		<svg xmlns="http://www.w3.org/2000/svg">
+			<rect width="100%" height="100%" fill="#000" onclick="toggleStart()"/>
+		</svg>
+	</body>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.6.1/gsap.min.js"></script>
+		<script>
+			function sleep(ms) {
+				return new Promise(resolve => setTimeout(resolve, ms));
+			}
+			
+			function randInt(min, max) {
+				return Math.floor(Math.random() * (max - min) ) + min;
+			}
+			
+			let go = false;
+			
+			async function animateCircle() {
+				console.clear()
+				const delay = 100;
+				const svg = document.querySelector("svg");
+				const svgns = "http://www.w3.org/2000/svg";
+				const boundingRect = svg.getBoundingClientRect();
+				
+				let xMax = boundingRect.width;
+				let yMax = boundingRect.height;
+				let foodRadius = 2;
+				
+				let foods = [];
+				for (let i = 0; i < 50; i++) {
+					let food = document.createElementNS(svgns, "circle");
+					
+					gsap.set(food, {
+						attr: {
+							cx: randInt(foodRadius, xMax-foodRadius),
+							cy: randInt(foodRadius, yMax-foodRadius),
+							r: foodRadius,
+							fill: "#FFFFFF"}});
+							
+					svg.appendChild(food);
+					foods.push(food);
+				}
+				
+				const radius = 25;
+				let x = y = 100;
+			
+				const bot = document.createElementNS(svgns, "circle");
+				gsap.set(bot, {
+					attr: {
+						cy: y,
+						cx: x,
+						r: radius,
+						fill: "#1723BC"}});
+				svg.appendChild(bot);
+			
+				let i = 0;
+			
+				let dx = 10;
+				let dy = 10;
+			
+				do {
+					i += 1
+					let nx = x + dx;
+					let ny = y + dy;
+				
+					dx--;
+					dy--;
+				
+					gsap.timeline({ delay: 0 })
+						.to(bot, {
+							duration: delay/1000,
+							attr: {cx: nx, cy: ny}, 
+							ease: "none"});
+					
+					x = nx;
+					y = ny;
+					await sleep(delay);
+				} while (go) ;
+			}
+			
+			function toggleStart () {
+				go = !go;
+			}
+			
+			animateCircle();
+		</script>
+</html>
