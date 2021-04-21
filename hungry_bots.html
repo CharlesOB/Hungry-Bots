@@ -200,18 +200,20 @@
 				}
 				
 				// Create the main bot and update location
-				let x = y = 100;
-				const botSVG = document.createElementNS(svgns, "circle");
-				gsap.set(botSVG, {
-					attr: {
-						cy: y,
-						cx: x,
-						r: radius,
-						fill: "#1723BC"}});
-				svg.appendChild(botSVG);
-				const bot = new Bot(botSVG);
-				bots.push(bot);
-
+				for (let i = 0; i < 5; i++) {
+					let x = randInt(0, xMax);
+					let y = randInt(0, yMax);
+					const botSVG = document.createElementNS(svgns, "circle");
+					gsap.set(botSVG, {
+						attr: {
+							cy: y,
+							cx: x,
+							r: radius,
+							fill: "#1723BC"}});
+					svg.appendChild(botSVG);
+					const bot = new Bot(botSVG);
+					bots.push(bot);
+				}
 			
 				// Run the main loop of the script
 				do {
