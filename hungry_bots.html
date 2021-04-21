@@ -40,75 +40,205 @@
 				return Math.floor(Math.random() * (max - min) ) + min;
 			}
 			
-			let go = false;
+			// Find the distance between two points in the form of [x, y].
+			function dist(pos1, pos2) {
+				let a = pos2[0] - pos1[0];
+				let b = pos2[1] - pos1[1];
+				return Math.sqrt(a ** 2 + b ** 2);
+			}
 			
-			async function animateCircle() {
+			// Multiply two matrices using dot multiplication. A matrix is a two dimensional array like this [[1, 0], [0, 1]]
+			function matrixDot(m1, m2) {
+				var result = [];
+				for (var i = 0; i < m1.length; i++) {
+					result[i] = [];
+					for (var j = 0; j < m2[0].length; j++) {
+						var sum = 0;
+						for (var k = 0; k < m1[0].length; k++) {
+							sum += m1[i][k] * m2[k][j];
+						}
+						result[i][j] = sum;
+					}
+				}
+				return result;
+			}
+			
+			// This function returns a boolean for whether pos2 (a point in the form of [x, y]) is to the left of an
+			// imaginary ray drawn from pos1 (a point in the form of [x, y]) at an angle of theta (in radians).
+			function leftOf (pos1, theta, pos2) {
+				theta %= Math.PI * 2; 
+				let a = pos2[0] - pos1[0];
+				let b = pos2[1] - pos1[1];
+				let distance = dist(pos1, pos2);
+				if (distance == 0) {return true;}
+				let theta2 = Math.acos(a / distance);
+				if (b < 0) {theta2 = Math.PI * 2 - theta2}
+				if (theta <= Math.PI) {
+					if (theta2 > theta && theta2 <= theta + Math.PI) {
+						return true;
+					} else {
+						return false;
+					}
+				} else {
+					if (theta2 < theta && theta2 >= theta - Math.PI) {
+						return false;
+					} else {
+						return true;
+					}
+				}
+			}
+			
+			// A custom Sprite class to define basic Sprite functionality
+			class Sprite {
+				constructor(svgElement) {
+					this.svgElement = svgElement;
+					this.cx = svgElement.cx.baseVal.value;
+					this.cy = svgElement.cy.baseVal.value;
+				}
+				
+				getXY() {
+					return [this.cx, this.cy];
+				}
+				
+				// Set the position of the sprite to a point in the form of [x, y]
+				setXY(point) {
+					this.cx = point[0]
+					this.cy = point[1]
+					gsap.set(this.svgElement, {
+						attr: {
+							cx: this.cx,
+							cy: this.cy
+						}
+					});
+				}
+				
+				// Redefined in child classes
+				update(bots, foods) {}
+			}
+			
+			// A bot sprite that manages its SVG Element and its updates
+			class Bot extends Sprite {
+				constructor(svgElement) {
+					super(svgElement);
+					this.theta = 0;
+				}
+			
+				// The bot will turn in the direction of the closest food
+				update(bots, foods) {
+					var closestFoodLeft = null;
+					var closestDistLeft = 1000000000000;
+					var closestFoodRight = null;
+					var closestDistRight = 1000000000000;
+					var point = this.getXY();
+					let firstTime = true;
+					for (const food of foods) {
+						let distance = dist(food.getXY(), point);
+						if (firstTime) {
+							closestDistLeft = closestDistRight = distance;
+							closestFoodLeft = closestFoodRight = food;
+							firstTime = false;
+						} else {
+							let isLeft = leftOf(point, this.theta, food.getXY());
+							if (isLeft && distance < closestDistLeft) {
+								closestDistLeft = distance;
+								closestFoodLeft = food;
+							} else if (!isLeft && distance < closestDistRight) {
+								closestDistRight = distance;
+								closestFoodRight = food;
+							}
+						}
+					}
+					if (closestDistLeft > closestDistRight) {
+						this.theta -= Math.PI / 10;
+					} else {
+						this.theta += Math.PI / 10;
+					}
+					let cx = this.cx + 5 * Math.cos(this.theta);
+					let cy = this.cy + 5 * Math.sin(this.theta);
+					this.setXY([cx, cy]);
+				}
+			}
+			
+			// A food sprite that manages its SVG Element and updates
+			class Food extends Sprite {}
+			
+			// Flag variable that can tell the main loop to stop
+			let running = true;
+			// Time in ms between screen updates (for 60fps)
+			const delay = 1000/60;
+			// Set up the SVG on the screen and define the namespace
+			const svg = document.querySelector("svg");
+			const svgns = "http://www.w3.org/2000/svg";
+			const boundingRect = svg.getBoundingClientRect();
+			var xMax = boundingRect.width;
+			var yMax = boundingRect.height;
+			
+			// Set size of food and bot sprites and set up arrays to hold the food and bot sprites
+			var foodRadius = 2;
+			var foods = [];
+			var bots = [];
+			const radius = 25;
+
+			
+			async function begin() {
 				console.clear()
-				const delay = 100;
-				const svg = document.querySelector("svg");
-				const svgns = "http://www.w3.org/2000/svg";
-				const boundingRect = svg.getBoundingClientRect();
 				
-				let xMax = boundingRect.width;
-				let yMax = boundingRect.height;
-				let foodRadius = 2;
-				
-				let foods = [];
+				// Create randomly placed food sprites as SVG circles
 				for (let i = 0; i < 50; i++) {
-					let food = document.createElementNS(svgns, "circle");
+					let foodSVG = document.createElementNS(svgns, "circle");
 					
-					gsap.set(food, {
+					gsap.set(foodSVG, {
 						attr: {
 							cx: randInt(foodRadius, xMax-foodRadius),
 							cy: randInt(foodRadius, yMax-foodRadius),
 							r: foodRadius,
 							fill: "#FFFFFF"}});
 							
-					svg.appendChild(food);
+					svg.appendChild(foodSVG);
+					let food = new Food(foodSVG);
 					foods.push(food);
 				}
 				
-				const radius = 25;
+				// Create the main bot and update location
 				let x = y = 100;
-			
-				const bot = document.createElementNS(svgns, "circle");
-				gsap.set(bot, {
+				const botSVG = document.createElementNS(svgns, "circle");
+				gsap.set(botSVG, {
 					attr: {
 						cy: y,
 						cx: x,
 						r: radius,
 						fill: "#1723BC"}});
-				svg.appendChild(bot);
+				svg.appendChild(botSVG);
+				const bot = new Bot(botSVG);
+				bots.push(bot);
+
 			
-				let i = 0;
-			
-				let dx = 10;
-				let dy = 10;
-			
+				// Run the main loop of the script
 				do {
-					i += 1
-					let nx = x + dx;
-					let ny = y + dy;
-				
-					dx--;
-					dy--;
-				
-					gsap.timeline({ delay: 0 })
-						.to(bot, {
-							duration: delay/1000,
-							attr: {cx: nx, cy: ny}, 
-							ease: "none"});
-					
-					x = nx;
-					y = ny;
+					update();
 					await sleep(delay);
-				} while (go) ;
+				} while (running) ;
+			}
+			
+			// Updates the positions of all sprites and performs collision detection and handling
+			function update () {				
+				for (const bot of bots) {
+					bot.update(bots, foods);
+				}
+				
+				for (const bot of bots) {
+					for (const food of foods) {
+						if (dist(bot.getXY(), food.getXY()) < radius) {
+							food.setXY([randInt(foodRadius, xMax-foodRadius), randInt(foodRadius, yMax-foodRadius)]);
+						}
+					}
+				}
 			}
 			
 			function toggleStart () {
-				go = !go;
+				running = !running;
 			}
 			
-			animateCircle();
+			begin();
 		</script>
 </html>
